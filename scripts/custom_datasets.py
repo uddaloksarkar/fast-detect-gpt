@@ -1,18 +1,37 @@
 import os.path
 import random
-import datasets
+# import datasets
 
 SEPARATOR = '<<<SEP>>>'
 
 
 DATASETS = ['writing', 'english', 'german', 'pubmed']
 
+# def load_dataset(path, name=None, split=None, cache_dir=None):
+#     # use local model if it exists
+#     local_path = os.path.join(cache_dir, f'local.{path}_{name}_{split}')
+#     if os.path.exists(local_path):
+#         return datasets.load_from_disk(local_path)
+#     return datasets.load_dataset(path, name, split=split, cache_dir=cache_dir)
+
 def load_dataset(path, name=None, split=None, cache_dir=None):
-    # use local model if it exists
-    local_path = os.path.join(cache_dir, f'local.{path}_{name}_{split}')
+    # Construct the expected path
+    local_path = os.path.join(cache_dir or ".", f'local.{path}_{name}_{split}')
+
+    # Try loading from cached path if available
     if os.path.exists(local_path):
-        return datasets.load_from_disk(local_path)
-    return datasets.load_dataset(path, name, split=split, cache_dir=cache_dir)
+        with open(local_path, "r") as f:
+            return json.load(f)
+
+    # Otherwise, try loading from the raw file
+    if path.endswith(".json"):
+        with open(path, "r") as f:
+            return json.load(f)
+    elif path.endswith(".jsonl"):
+        with open(path, "r") as f:
+            return [json.loads(line) for line in f]
+    else:
+        raise ValueError(f"Unsupported file format for path: {path}")
 
 def load_pubmed(cache_dir):
     data = load_dataset('pubmed_qa', 'pqa_labeled', split='train', cache_dir=cache_dir)

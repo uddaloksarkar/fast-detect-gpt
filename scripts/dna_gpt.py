@@ -19,13 +19,21 @@ from model import load_tokenizer, load_model
 from metrics import get_roc_metrics, get_precision_recall_metrics
 import custom_datasets
 
+def load_data(input_file):
+    data_file = f"{input_file}.raw_data.json"
+    with open(data_file, "r") as fin:
+        data = json.load(fin)
+        print(f"Raw data loaded from {data_file}")
+    return data
+
+
 class PrefixSampler:
     def __init__(self, args):
         self.args = args
         self.base_tokenizer = load_tokenizer(args.base_model_name, args.cache_dir)
         self.base_model = load_model(args.base_model_name, args.device, args.cache_dir)
 
-    def _sample_from_model(self, texts, min_words=55, truncate_ratio=0.5):
+    def _sample_from_model(self, texts, min_words=10, truncate_ratio=0.5):
         # encode each text as a list of token ids
         if self.args.dataset == 'pubmed':
             pubmed_sep = ' Answer:'
@@ -54,6 +62,7 @@ class PrefixSampler:
             elif self.args.do_top_k:
                 sampling_kwargs['top_k'] = self.args.top_k
             min_length = 50 if self.args.dataset in ['pubmed'] else 150
+            all_encoded.pop('token_type_ids', None)  # remove token_type_ids if present
             outputs = self.base_model.generate(**all_encoded, min_length=min_length, max_length=200, do_sample=True,
                                                **sampling_kwargs, pad_token_id=self.base_tokenizer.eos_token_id,
                                                eos_token_id=self.base_tokenizer.eos_token_id)
@@ -91,7 +100,7 @@ class PrefixSampler:
         for batch in range(len(raw_data) // batch_size):
             print('Generating samples for batch', batch, 'of', len(raw_data) // batch_size)
             original_text = raw_data[batch * batch_size:(batch + 1) * batch_size]
-            sampled_text = self._sample_from_model(original_text, min_words=30 if self.args.dataset in ['pubmed'] else 55, truncate_ratio=self.args.truncate_ratio)
+            sampled_text = self._sample_from_model(original_text, min_words=30 if self.args.dataset in ['pubmed'] else 10, truncate_ratio=self.args.truncate_ratio)
 
             for o, s in zip(original_text, sampled_text):
                 if self.args.dataset == 'pubmed':
@@ -117,6 +126,7 @@ def get_likelihood(logits, labels, pad_index):
 def get_log_prob(sampler, text):
     tokenized = sampler.base_tokenizer(text, return_tensors="pt", padding=True).to(sampler.args.device)
     labels = tokenized.input_ids[:, 1:]
+    tokenized.pop('token_type_ids', None)  
     with torch.no_grad():
         logits_score = sampler.base_model(**tokenized).logits[:, :-1]
         return get_likelihood(logits_score, labels, sampler.base_tokenizer.pad_token_id)
@@ -128,6 +138,7 @@ def get_log_probs(sampler, texts):
         tokenized = sampler.base_tokenizer(texts[batch * batch_size:(batch + 1) * batch_size], return_tensors="pt", padding=True).to(sampler.args.device)
         labels = tokenized.input_ids[:, 1:]
         with torch.no_grad():
+            tokenized.pop('token_type_ids', None)  # remove token_type_ids if present
             logits_score = sampler.base_model(**tokenized).logits[:, :-1]
             lprobs = get_likelihood(logits_score, labels, sampler.base_tokenizer.pad_token_id)
             batch_lprobs.append(lprobs)

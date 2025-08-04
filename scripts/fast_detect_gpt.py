@@ -10,9 +10,17 @@ import torch.nn.functional as F
 import tqdm
 import argparse
 import json
-from data_builder import load_data
+# from data_builder import load_data
 from model import load_tokenizer, load_model
 from metrics import get_roc_metrics, get_precision_recall_metrics
+
+def load_data(input_file):
+    data_file = f"{input_file}.json"
+    with open(data_file, "r") as fin:
+        data = json.load(fin)
+        print(f"Raw data loaded from {data_file}")
+    return data
+
 
 def get_samples(logits, labels):
     assert logits.shape[0] == 1
@@ -71,7 +79,7 @@ def get_sampling_discrepancy_analytic(logits_ref, logits_score, labels):
 
 def experiment(args):
     # load model
-    scoring_tokenizer = load_tokenizer(args.scoring_model_name, args.dataset, args.cache_dir)
+    scoring_tokenizer = load_tokenizer(args.scoring_model_name, args.cache_dir)
     scoring_model = load_model(args.scoring_model_name, args.device, args.cache_dir)
     scoring_model.eval()
     if args.sampling_model_name != args.scoring_model_name:
@@ -97,26 +105,26 @@ def experiment(args):
         original_text = data["original"][idx]
         sampled_text = data["sampled"][idx]
         # original text
-        tokenized = scoring_tokenizer(original_text, return_tensors="pt", padding=True, return_token_type_ids=False).to(args.device)
+        tokenized = scoring_tokenizer(original_text, return_tensors="pt", padding=True).to(args.device)
         labels = tokenized.input_ids[:, 1:]
         with torch.no_grad():
             logits_score = scoring_model(**tokenized).logits[:, :-1]
             if args.sampling_model_name == args.scoring_model_name:
                 logits_ref = logits_score
             else:
-                tokenized = sampling_tokenizer(original_text, return_tensors="pt", padding=True, return_token_type_ids=False).to(args.device)
+                tokenized = sampling_tokenizer(original_text, return_tensors="pt", padding=True).to(args.device)
                 assert torch.all(tokenized.input_ids[:, 1:] == labels), "Tokenizer is mismatch."
                 logits_ref = sampling_model(**tokenized).logits[:, :-1]
             original_crit = criterion_fn(logits_ref, logits_score, labels)
         # sampled text
-        tokenized = scoring_tokenizer(sampled_text, return_tensors="pt", padding=True, return_token_type_ids=False).to(args.device)
+        tokenized = scoring_tokenizer(sampled_text, return_tensors="pt", padding=True).to(args.device)
         labels = tokenized.input_ids[:, 1:]
         with torch.no_grad():
             logits_score = scoring_model(**tokenized).logits[:, :-1]
             if args.sampling_model_name == args.scoring_model_name:
                 logits_ref = logits_score
             else:
-                tokenized = sampling_tokenizer(sampled_text, return_tensors="pt", padding=True, return_token_type_ids=False).to(args.device)
+                tokenized = sampling_tokenizer(sampled_text, return_tensors="pt", padding=True).to(args.device)
                 assert torch.all(tokenized.input_ids[:, 1:] == labels), "Tokenizer is mismatch."
                 logits_ref = sampling_model(**tokenized).logits[:, :-1]
             sampled_crit = criterion_fn(logits_ref, logits_score, labels)

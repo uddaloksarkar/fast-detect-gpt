@@ -17,7 +17,7 @@ def from_pretrained(cls, model_name, kwargs, cache_dir):
 
 # predefined models
 model_fullnames = {  'gpt2': 'gpt2',
-                     'gpt2-xl': 'gpt2-xl',
+                     'gpt2-xl': './gpt2-xl',
                      'opt-2.7b': 'facebook/opt-2.7b',
                      'gpt-neo-2.7B': 'EleutherAI/gpt-neo-2.7B',
                      'gpt-j-6B': 'EleutherAI/gpt-j-6B',
@@ -31,6 +31,9 @@ model_fullnames = {  'gpt2': 'gpt2',
                      'opt-13b': 'facebook/opt-13b',
                      'falcon-7b': 'tiiuae/falcon-7b',
                      'falcon-7b-instruct': 'tiiuae/falcon-7b-instruct',
+                     'deepseek': './deepseek',
+                     'codegemma': './codegemma',
+                     'stability': './stability'
                      }
 float16_models = ['gpt-neo-2.7B', 'gpt-j-6B', 'gpt-neox-20b', 'llama-13b', 'llama2-13b', 'bloom-7b1', 'opt-13b',
                   'falcon-7b', 'falcon-7b-instruct']
